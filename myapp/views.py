@@ -1,13 +1,25 @@
-from django.shortcuts import render, HttpResponse
+from django.shortcuts import render, HttpResponse, redirect
+from django.views.decorators.csrf import csrf_exempt
  
+nextId = 4
 topics = [
     {'id':1, 'title' : 'Routing', 'body' : 'Routing is ...'},
     {'id':2, 'title' : 'View', 'body' : 'View is ...'},
     {'id':3, 'title' : 'model', 'body' : 'Model is ...'}
 ]
 
-def HTMLTemplete(articleTag):
+def HTMLTemplete(articleTag, id=None):
     global topics
+    contextUI = ''
+    if id != None:
+        contextUI = f'''
+            <li>
+                <form action="/delete/" method="post">
+                    <input type="hidden" name="id" value={id}>
+                    <input type="submit" value="delete">
+                </form>
+            </li>
+        '''
     ol = ''
     for topic in topics:
         ol += f'<li><a href ="/read/{topic["id"]}">{topic["title"]}</a></li>'
@@ -21,6 +33,7 @@ def HTMLTemplete(articleTag):
         {articleTag}
         <ul>
             <li><a href="/create/">create</a></li>
+            {contextUI}
         </ul>
     </body>
     </html>
@@ -39,14 +52,37 @@ def read(req, id):
     for topic in topics:
         if topic['id'] == int(id):
             article =f'<h2>{topic["title"]}</h2>{topic["body"]}'
-    return HttpResponse(HTMLTemplete(article))
+    return HttpResponse(HTMLTemplete(article, id))
 
+@csrf_exempt
 def create(req):
-    article = '''
-        <form action="/create/">
-            <p><input type="text" name="title" placeholder="title"></p>
-            <p><textarea name="body" placeholder="body"></textarea></p>
-            <p><input type="submit"></p>
-        </form>
-    '''
-    return HttpResponse(HTMLTemplete(article))
+    global nextId
+    if req.method == 'GET':
+        article = '''
+            <form action="/create/" method="post">
+                <p><input type="text" name="title" placeholder="title"></p>
+                <p><textarea name="body" placeholder="body"></textarea></p>
+                <p><input type="submit"></p>
+            </form>
+        '''
+        return HttpResponse(HTMLTemplete(article))
+    elif req.method == 'POST':
+        title = req.POST['title']
+        body = req.POST['body']
+        newTopic = {"id" : nextId,"title" : title, "body" : body}
+        topics.append(newTopic)
+        url = '/read/' + str(nextId)
+        nextId = nextId + 1
+        return redirect(url)
+
+@csrf_exempt
+def delete(req):
+    global topics
+    if req.method == 'POST':
+        id = req.POST['id']
+        newTopics = []
+        for topic in topics:
+            if topic['id'] != int(id):
+                newTopics.append(topic)
+        topics = newTopics
+        return  redirect('/')
